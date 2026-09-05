@@ -56,8 +56,6 @@
   },
   "scripts": {
     "prepublishOnly": "npm run build",
-    "prepare": "npm run build",
-    "postinstall": "npm run build",
     "build": "rollup -c",
     "build-standalone": "browserify --standalone PDFDocument --ignore crypto js/pdfkit.browser.js -o js/pdfkit.standalone.js",
     "browserify-example": "browserify examples/browserify/browser.js > examples/browserify/bundle.js",
