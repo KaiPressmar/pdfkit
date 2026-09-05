@@ -1,7 +1,32 @@
+import zlib from 'zlib';
 import PDFDocument from '../../lib/document';
 import PDFSecurity from '../../lib/security';
 import { logData, joinTokens } from './helpers';
 import PDFFontFactory from '../../lib/font_factory';
+
+// Returns the sfnt table tags present in a raw TrueType/OpenType font
+// program, so a test can check whether a `cmap` table survived embedding.
+function sfntTableTags(fontBytes) {
+  const numTables = fontBytes.readUInt16BE(4);
+  const tags = [];
+  for (let i = 0; i < numTables; i++) {
+    const offset = 12 + i * 16;
+    tags.push(fontBytes.toString('latin1', offset, offset + 4));
+  }
+  return tags;
+}
+
+// Returns the body (as a single binary string, stream bytes included) of the
+// `n 0 obj ... endobj` entry logged by `logData`.
+function objectBody(docData, n) {
+  const start = docData.indexOf(`${n} 0 obj`);
+  if (start === -1) return null;
+  const end = docData.indexOf('endobj', start);
+  return docData
+    .slice(start + 1, end)
+    .map((item) => (item instanceof Buffer ? item.toString('binary') : item))
+    .join('\n');
+}
 
 // manual mock for PDFSecurity to ensure stored id will be the same accross different systems
 PDFSecurity.generateFileID = () => {
@@ -63,7 +88,7 @@ describe('acroform', () => {
 
   test('init standard fonts', () => {
     const expected = [
-      '12 0 obj',
+      '13 0 obj',
       joinTokens(
         '<<',
         '/FT',
@@ -75,7 +100,7 @@ describe('acroform', () => {
         '/Font',
         '<<',
         '/F3',
-        '10 0 R',
+        '12 0 R',
         '>>',
         '>>',
         '/DA',
@@ -416,5 +441,72 @@ describe('acroform', () => {
         }
       }
     }
+  });
+
+  // Regression test for https://github.com/foliojs/pdfkit/issues/1096:
+  // a custom embedded font applied to a form field rendered with the wrong
+  // font in readers (e.g. Adobe Acrobat/Reader) that regenerate the field's
+  // appearance from its value, even though the same font renders correctly
+  // for ordinary page text.
+  test('AcroForm uses a font a reader can resolve field text against on its own', () => {
+    const docData = logData(doc);
+
+    doc.font('tests/fonts/Roboto-Regular.ttf');
+    doc.initForm();
+    doc.formText('field1', 10, 10, 200, 20, { value: 'Hello' });
+    // Also draw with the same font in the page content, so the test proves
+    // the two usages embed independently rather than sharing one font object.
+    doc.text('Hello', 10, 100);
+    doc.end();
+
+    // Locate the AcroForm dict, and the font object its /DR references.
+    const acroFormIdx = docData.findIndex(
+      (item) => typeof item === 'string' && item.includes('/NeedAppearances'),
+    );
+    expect(acroFormIdx).toBeGreaterThan(-1);
+    const drFontRef = docData[acroFormIdx].match(
+      /\/DR\s*<<\s*\/Font\s*<<\s*\/\S+\s+(\d+)\s+0\s+R/,
+    );
+    expect(drFontRef).not.toBeNull();
+    const acroFormFontBody = objectBody(docData, drFontRef[1]);
+
+    // The AcroForm font must be a simple font under a standard encoding, not
+    // the Type0/Identity-H composite font pdfkit uses in content streams:
+    // Identity-H has no character encoding a reader can resolve on its own.
+    expect(acroFormFontBody).toContain('/Subtype /TrueType');
+    expect(acroFormFontBody).toContain('/Encoding /WinAnsiEncoding');
+    expect(acroFormFontBody).not.toContain('/Subtype /Type0');
+
+    // The font actually used to draw page text is a different object,
+    // untouched: still the subsetted Type0/Identity-H composite font,
+    // addressed by glyph ID rather than by a standard character encoding.
+    const pageFontRefIdx = docData.findIndex(
+      (item) =>
+        typeof item === 'string' &&
+        item.includes('/ProcSet') &&
+        item.includes('/Font'),
+    );
+    expect(pageFontRefIdx).toBeGreaterThan(-1);
+    const pageFontRef = docData[pageFontRefIdx].match(/\/F\d+ (\d+) 0 R/);
+    expect(pageFontRef[1]).not.toBe(drFontRef[1]);
+    const contentFontBody = objectBody(docData, pageFontRef[1]);
+    expect(contentFontBody).toContain('/Subtype /Type0');
+    expect(contentFontBody).toContain('/Encoding /Identity-H');
+
+    // The whole point: the AcroForm font's embedded program must still carry
+    // a `cmap` table, so a reader has a way to map arbitrary field text to
+    // glyphs. pdfkit's normal subset omits `cmap` because it addresses
+    // glyphs directly by ID from content streams it authors itself.
+    const fontDescriptorRef = acroFormFontBody.match(
+      /\/FontDescriptor (\d+) 0 R/,
+    );
+    const descriptorBody = objectBody(docData, fontDescriptorRef[1]);
+    const fontFileRef = descriptorBody.match(/\/FontFile2 (\d+) 0 R/);
+    const fontFileBody = objectBody(docData, fontFileRef[1]);
+    const streamMatch = fontFileBody.match(
+      /stream\r?\n([\s\S]*?)\r?\nendstream/,
+    );
+    const fontBytes = zlib.inflateSync(Buffer.from(streamMatch[1], 'binary'));
+    expect(sfntTableTags(fontBytes)).toContain('cmap');
   });
 });

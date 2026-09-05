@@ -346,6 +346,16 @@ Some form documents may not need to generate appearances. This may be the case
 for text Form Annotations that initially have no value. This is not true for
 push button widget annotations. Please test
 
+Because `NeedAppearances` asks the viewer to build a field's appearance from
+its plain-text value at any time, the viewer needs to resolve that text to
+glyphs on its own using the font in the AcroForm's `DR`/`DA` resources. When a
+custom font is used, PDFKit embeds a dedicated, non-subsetted copy of that
+font for this purpose (distinct from the subsetted, glyph-ID-addressed copy
+used in page content), so a viewer can look up any character itself instead of
+falling back to a substitute font.
+
+
+
 ### Document JavaScript
 
 Many PDF Viewers, aside from Adobe Acrobat Reader, do not implement document
