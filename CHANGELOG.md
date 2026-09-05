@@ -2,6 +2,8 @@
 
 ### Unreleased
 
+- Add an `onClick` option to `formPushButton` (and other form annotation methods) for a field's mouse-up JavaScript action, replacing the previous `AA`-plus-`format` escape hatch. Accepts a plain function, called with Acrobat's `app`/`getField`/`display`/`event` as arguments and `this` bound to the Document, as well as a string. TypeScript projects can import types for this signature from the new `pdfkit/types/acrobat-js`
+
 ### [v0.20.2] - 2026-08-29
 
 - Fix bundlers and file tracers packing the ESM copies of the standard font metrics instead of the CommonJS ones the Node build actually loads, which left `Cannot find module` errors for every standard font at runtime, by resolving the internal `#standard-fonts/*` mapping to a single file under all conditions

@@ -84,6 +84,10 @@
       "require": "./js/output.cjs",
       "default": "./js/output.mjs"
     },
+    "./types/acrobat-js": {
+      "types": "./types/acrobat-js.d.ts",
+      "default": "./types/acrobat-js.d.ts"
+    },
     "./standard-fonts/Courier": {
       "require": "./js/standard-fonts/Courier.cjs",
       "default": "./js/standard-fonts/Courier.mjs"
