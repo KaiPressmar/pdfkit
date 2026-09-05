@@ -2,6 +2,8 @@
 
 ### Unreleased
 
+- Fix AcroForm text fields with a custom embedded font rendering in the wrong font in readers (e.g. Adobe Acrobat/Reader) that regenerate a field's appearance from its value, by giving the AcroForm `/DR` and `/DA` resources their own complete, simply-encoded font instead of reusing the subsetted `Identity-H` font pdfkit's content streams address by glyph ID. Fixes #1096
+
 ### [v0.20.2] - 2026-08-29
 
 - Fix bundlers and file tracers packing the ESM copies of the standard font metrics instead of the CommonJS ones the Node build actually loads, which left `Cannot find module` errors for every standard font at runtime, by resolving the internal `#standard-fonts/*` mapping to a single file under all conditions
