@@ -118,13 +118,54 @@ These options are accepted by `formPushButton`:
 
 - `label` [_string_] - Sets the label text. You can also set an icon, but for
   this you will need to 'expert-up' and dig deeper into the PDF Reference manual.
+- `onClick` [_string | function_] - JavaScript to run when the button is
+  clicked (its mouse-up action). If a `format` option is also given, its
+  keystroke/format validation actions are added alongside this one rather
+  than replacing it.
 
 ```js
 var opts = {
   backgroundColor: 'yellow',
-  label: 'Test Button'
+  label: 'Test Button',
+  onClick: 'app.alert("clicked");'
 };
 doc.formPushButton('btn1', 10, 200, 100, 30, opts);
+```
+
+`onClick` also accepts a plain function, called with Acrobat's own `app`,
+`getField`, `display` and `event` passed in as arguments, in that order (and
+`this` bound to the Document, exactly as Acrobat itself binds it). Declare
+only the leading parameters your handler actually uses — `function (app) {}`
+or even `function () {}` are both fine, since the call always passes all of
+them regardless of how many the handler declares; the rest are simply
+ignored, the same way `array.map(item => ...)` can ignore the `index` and
+`array` parameters its callback type also offers. This runs inside the PDF
+viewer's own JavaScript engine, not wherever the PDF was generated, so it
+can't close over outside variables — use only plain function syntax (not
+e.g. arrow functions, which also can't bind `this`) for the widest viewer
+support:
+
+```js
+doc.formPushButton('btn1', 10, 200, 100, 30, {
+  label: 'Test Button',
+  onClick: function (app, getField) {
+    app.alert('clicked');
+    this.getField('otherField').value = 'updated from btn1';
+  }
+});
+```
+
+TypeScript projects can import `AcrobatOnClick` and the other types this
+signature uses from `pdfkit/types/acrobat-js` — a small, best-effort set of
+types for the handful of Acrobat globals most `onClick` handlers need, kept
+separate from pdfkit's own types so nothing is declared globally:
+
+```ts
+import type { AcrobatOnClick } from 'pdfkit/types/acrobat-js';
+
+const onClick: AcrobatOnClick = function (app) {
+  app.alert('clicked');
+};
 ```
 
 #### Radio Button Field Options
@@ -302,7 +343,7 @@ The output of this example looks like this.
 
 ### Advanced Form Field Use
 
-Older implementations used to pass all unknown options to the internal PDF object structure. A small set of direct PDF dictionary escape hatches is still recognized: `Ff`, `MK.CA`, and `AA` when a `format` option is used but its use is discouraged and likely will be removed in future versions.
+Older implementations used to pass all unknown options to the internal PDF object structure. A small set of direct PDF dictionary escape hatches is still recognized: `Ff` and `MK.CA`, but their use is discouraged and they may be removed in future versions. A previously-recognized `AA` escape hatch (only reachable together with a `format` option) has been replaced by the `onClick` option above, which needs no PDF dictionary knowledge and works on its own.
 
 If an option is not supported, open an issue on Github and it will be considered for addition to the API.
 
