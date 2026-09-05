@@ -4,6 +4,7 @@
 
 - Fix AcroForm text fields with a custom embedded font rendering in the wrong font in readers (e.g. Adobe Acrobat/Reader) that regenerate a field's appearance from its value, by giving the AcroForm `/DR` and `/DA` resources their own dedicated composite font, holding every glyph and addressed through a custom WinAnsiEncoding-to-glyph CMap, instead of reusing the subsetted `Identity-H` font pdfkit's content streams address by glyph ID. Fixes #1096
 - Add an `onClick` option to `formPushButton` (and other form annotation methods) for a field's mouse-up JavaScript action, replacing the previous `AA`-plus-`format` escape hatch. Accepts a plain function, called with Acrobat's `app`/`getField`/`display`/`event` as arguments and `this` bound to the Document, as well as a string. TypeScript projects can import types for this signature from the new `pdfkit/types/acrobat-js`
+- Add a `hidden` option to form annotation methods, for a field that should start hidden (e.g. one an interactive action reveals later) instead of the usual default of visible and printable
 
 ### [v0.20.2] - 2026-08-29
 
